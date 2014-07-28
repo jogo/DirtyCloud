@@ -70,9 +70,11 @@ def main():
 
     print "weights"
     print "min: %s, max: %s" % gitgraph.get_weight_range()
-    print "((Reviewer, Author)), Weight)"
+    print
+    print "((Reviewer, Author)): weight (hits/reviews))"
     for x in gitgraph.get_strongest_edges():
-        print x
+        key, (hits, reviews) = x
+        print "'%s': %f (%d/%d)" % (key, hits/reviews, hits, reviews, )
 
     generate_graph(gitgraph,
                    options.save,

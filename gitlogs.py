@@ -22,6 +22,7 @@ class RawGitGraph(object):
         self.commits = self.get_git_commits()
         self.core_reviewers = self.get_core_reviewers()
         self.unweighted_graph = self.generate_raw_git_graph()
+
     def get_git_commits(self):
         """Get git log with gerrit notes."""
         cwd = os.getcwd()
@@ -107,6 +108,14 @@ class ProcessedGitGraph(RawGitGraph):
         super(ProcessedGitGraph, self).__init__(git_repo=git_repo)
         self.weighted_graph = self.weight_graph()
 
+    def count_edges(self):
+        # key: (Reviewer,Author), value:edge count
+        weighted = collections.defaultdict(float)
+        # weigh edges
+        for edge in self.unweighted_graph:
+            weighted[edge] += 1
+        return weighted
+
     def weight_graph(self):
         """Assign weights to edges.
 
@@ -114,13 +123,25 @@ class ProcessedGitGraph(RawGitGraph):
         weight = (# duplicate edges)/(# of reviews by ReviewerA)
         """
         # key: (Reviewer,Author), value:weight
-        weighted = collections.defaultdict(float)
-        # weigh edges
-        for edge in self.unweighted_graph:
-            weighted[edge] += 1
+        weighted = self.count_edges()
         # normalize weights by total reviews per reviewer
         for edge in weighted:
             weighted[edge] = weighted[edge]/self.core_reviewers[edge[0]]
+        # clean up data
+        hit_list = set([])
+        for edge in weighted:
+        # sanity check, if any weights are 1, remove.
+            if weighted[edge] > 0.99:
+                hit_list.add(edge)
+            # if author/reviewer has less then 3 core reviews, probably not a core
+            if (self.core_reviewers[edge[1]] < 3 or
+                self.core_reviewers[edge[0]] < 3):
+                hit_list.add(edge)
+            # if under 1%, drop
+            if weighted[edge] < 0.03:
+                hit_list.add(edge)
+        for hit in hit_list:
+            del weighted[hit]
         return weighted
 
     def get_weight_range(self):
@@ -128,10 +149,16 @@ class ProcessedGitGraph(RawGitGraph):
         max_weight = max(self.weighted_graph.values())
         return (min_weight, max_weight)
 
-    def get_strongest_edges(self, n=5):
-        """"Return list with top n strongest edges."""
+    def get_strongest_edges(self, n=10):
+        """"Return list with top n strongest edges with raw edge numbers."""
+        # Get raw numbers
+        raw = dict()
+        edge_count = self.count_edges()
+        for key in self.weighted_graph.keys():
+            reviewer = key[0]
+            raw[key] = (edge_count[key], self.core_reviewers[reviewer])
         # Sort dict by key
-        strongest = sorted(self.weighted_graph.iteritems(), key=lambda x: x[1],
+        strongest = sorted(raw.iteritems(), key=lambda x: (x[1][0]/x[1][1]),
                            reverse=True)
         return strongest[:n]
 
