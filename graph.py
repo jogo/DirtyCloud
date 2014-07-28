@@ -8,7 +8,7 @@ import networkx as nx
 import gitlogs
 
 
-def generate_graph(gitgraph, name):
+def generate_graph(gitgraph, save, name):
     g = nx.MultiDiGraph()
     for edge in gitgraph.weighted_graph:
         g.add_edge(edge[0], edge[1], weight=gitgraph.weighted_graph[edge])
@@ -43,7 +43,8 @@ def generate_graph(gitgraph, name):
     nx.draw_networkx_labels(g, pos, font_size=10, font_family='sans-serif')
 
     plt.axis('off')
-    plt.savefig("%s.png" % name)
+    if save:
+        plt.savefig("%s.png" % name)
     plt.show()
 
 
@@ -55,6 +56,9 @@ def main():
     optparser.add_option('-p', '--pseudonyms',
                          action='store_true',
                          help='Use pseudonyms instead of email addresses')
+    optparser.add_option('-s', '--save',
+                         action='store_true',
+                         help='Save image')
     options, args = optparser.parse_args()
 
     repo_path = '/home/jogo/Develop/' + options.repository
@@ -70,7 +74,9 @@ def main():
     for x in gitgraph.get_strongest_edges():
         print x
 
-    generate_graph(gitgraph, options.repository.replace("/", "_"))
+    generate_graph(gitgraph,
+                   options.save,
+                   options.repository.replace("/", "_"))
 
 if __name__ == '__main__':
     main()
