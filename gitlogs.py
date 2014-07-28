@@ -1,4 +1,5 @@
 import collections
+import json
 import os
 import random
 import subprocess
@@ -15,12 +16,12 @@ class RawGitGraph(object):
 
     def __init__(self, git_repo='/home/jogo/Develop/openstack/nova'):
         super(RawGitGraph, self).__init__()
+        with open('stackalytics.json') as data:
+            self.stackalytics = json.load(data)
         self.git_repo = git_repo
         self.commits = self.get_git_commits()
         self.core_reviewers = self.get_core_reviewers()
         self.unweighted_graph = self.generate_raw_git_graph()
-        # TODO(jogo) add mailmap support for author and reviewers
-
     def get_git_commits(self):
         """Get git log with gerrit notes."""
         cwd = os.getcwd()
@@ -85,7 +86,20 @@ class RawGitGraph(object):
 
     def get_email(self, line):
         """Parse git log to find email."""
-        return line.split()[-1]
+        return self.get_stackalytics_user_name(line.split()[-1][1:-1])
+
+    def get_stackalytics_user_name(self, email):
+        # up to date mailmap file
+        # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
+        # TODO(jogo) download new version if internet, else look for local copy
+        for user in self.stackalytics["users"]:
+            if email in list(user['emails']):
+                for company in user['companies']:
+                    if not company['end_date']:
+                        return "%s (%s)" % (user['user_name'],
+                                company['company_name'])
+                return user['user_name']
+        return email
 
 
 class ProcessedGitGraph(RawGitGraph):
