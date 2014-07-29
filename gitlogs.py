@@ -16,6 +16,10 @@ class RawGitGraph(object):
 
     def __init__(self, git_repo='/home/jogo/Develop/openstack/nova'):
         super(RawGitGraph, self).__init__()
+        # up to date mailmap file
+        # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
+        # TODO(jogo) download new version if internet, else look for local copy
+
         with open('stackalytics.json') as data:
             self.stackalytics = json.load(data)
         self.git_repo = git_repo
@@ -67,7 +71,7 @@ class RawGitGraph(object):
         edges = []
         for line in commit.split('\n'):
             if line.startswith("Author: "):
-                author = self.get_email(line)
+                author = self.get_name_from_git_logs(line)
                 break
         for reviewer in self.get_core_reviewers_on_commit(commit):
             edges.append((reviewer, author))
@@ -82,23 +86,20 @@ class RawGitGraph(object):
                 # Make sure we ignore the git commit message
                 notes = True
             elif notes and "Code-Review+2: " in line:
-                reviewers.append(self.get_email(line))
+                reviewers.append(self.get_name_from_git_logs(line))
         return reviewers
 
-    def get_email(self, line):
+    def get_name_from_git_logs(self, line):
         """Parse git log to find email."""
         return self.get_stackalytics_user_name(line.split()[-1][1:-1])
 
     def get_stackalytics_user_name(self, email):
-        # up to date mailmap file
-        # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
-        # TODO(jogo) download new version if internet, else look for local copy
         for user in self.stackalytics["users"]:
             if email in list(user['emails']):
                 for company in user['companies']:
                     if not company['end_date']:
-                        return "%s (%s)" % (user['user_name'],
-                                company['company_name'])
+                        return ("%s (%s)" % (user['user_name'],
+                                company['company_name']))
                 return user['user_name']
         return email
 
@@ -130,12 +131,13 @@ class ProcessedGitGraph(RawGitGraph):
         # clean up data
         hit_list = set([])
         for edge in weighted:
-        # sanity check, if any weights are 1, remove.
+            # sanity check, if any weights are 1, remove.
             if weighted[edge] > 0.99:
                 hit_list.add(edge)
-            # if author/reviewer has less then 3 core reviews, probably not a core
+            # if author/reviewer has less then 3 core reviews, probably
+            # not a core
             if (self.core_reviewers[edge[1]] < 3 or
-                self.core_reviewers[edge[0]] < 3):
+                    self.core_reviewers[edge[0]] < 3):
                 hit_list.add(edge)
             # if under 1%, drop
             if weighted[edge] < 0.03:
@@ -149,7 +151,7 @@ class ProcessedGitGraph(RawGitGraph):
         max_weight = max(self.weighted_graph.values())
         return (min_weight, max_weight)
 
-    def get_strongest_edges(self, n=10):
+    def get_strongest_edges(self, n=20):
         """"Return list with top n strongest edges with raw edge numbers."""
         # Get raw numbers
         raw = dict()
@@ -163,6 +165,19 @@ class ProcessedGitGraph(RawGitGraph):
         return strongest[:n]
 
 
+    def print_records(self):
+        print "weights"
+        print "min: %s, max: %s" % self.get_weight_range()
+        print
+        print "((Reviewer, Author)): weight (hits/reviews))"
+        for x in self.get_strongest_edges():
+            key, (hits, reviews) = x
+            print "'%s': %f (%d/%d)" % (key, hits/reviews, hits, reviews, )
+
+
+
+
+
 class AnonimizedGitGraph(ProcessedGitGraph):
     """Replace emails with pseudonyms."""
 
@@ -171,9 +186,9 @@ class AnonimizedGitGraph(ProcessedGitGraph):
         self.email_map = dict()
         super(AnonimizedGitGraph, self).__init__(git_repo=git_repo)
 
-    def get_email(self, line):
+    def get_name_from_git_logs(self, line):
         """Parse git log to find email."""
-        email = super(AnonimizedGitGraph, self).get_email(line)
+        email = super(AnonimizedGitGraph, self).get_name_from_git_logs(line)
         return self.anonimize_email(email)
 
     def anonimize_email(self, email):

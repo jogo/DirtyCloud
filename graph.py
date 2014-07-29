@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
+import matplotlib.pyplot as plt
 import optparse
 
-import matplotlib.pyplot as plt
 import networkx as nx
 
 import gitlogs
@@ -68,13 +68,7 @@ def main():
     else:
         gitgraph = gitlogs.ProcessedGitGraph(git_repo=repo_path)
 
-    print "weights"
-    print "min: %s, max: %s" % gitgraph.get_weight_range()
-    print
-    print "((Reviewer, Author)): weight (hits/reviews))"
-    for x in gitgraph.get_strongest_edges():
-        key, (hits, reviews) = x
-        print "'%s': %f (%d/%d)" % (key, hits/reviews, hits, reviews, )
+    gitgraph.print_records()
 
     generate_graph(gitgraph,
                    options.save,
