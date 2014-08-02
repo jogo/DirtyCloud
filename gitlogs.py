@@ -6,24 +6,24 @@ import subprocess
 
 
 class Node(object):
-    def __init__(self, name, core=True):
+    def __init__(self, name):
         super(Node, self).__init__()
         self.name = name
-        self.core = core
+        self.emails = []
         self.review_count = 0
+        self.patch_count = 0
+
+    def is_core(self):
+        # Since currently only using git notes this isn't precise
+        return self.review_count > 3
 
     def __repr__(self):
-        return self.name
-
-    def __str__(self):
         return self.name
 
 
 class RawGitGraph(object):
     """Extract gerrit +2 reviews from  git logs with notes.
 
-    Only use commits where the author is a core reviewer,
-    otherwise the graphs becomes unwieldy.
     Core reviewer defined as someone who can do "Code-Review+2: ".
     Generates a list of edges: (Reviewer, Author)
     """
@@ -65,9 +65,7 @@ class RawGitGraph(object):
             if len(edge) == 0:
                 # something went wrong
                 continue
-            # if author is a core reviewer
-            if edge[0][1].review_count > 0:
-                edges = edges + edge
+            edges = edges + edge
         return edges
 
     def parse_commit(self, commit):
@@ -76,6 +74,7 @@ class RawGitGraph(object):
         for line in commit.split('\n'):
             if line.startswith("Author: "):
                 author = self.get_node(line)
+                author.patch_count += 1
                 break
         for reviewer in self.get_core_reviewers_on_commit(commit):
             reviewer.review_count += 1
@@ -102,7 +101,8 @@ class RawGitGraph(object):
 
     def get_name_from_git_logs(self, line):
         """Parse git log to find email."""
-        return self.get_stackalytics_user_name(line.split()[-1][1:-1])
+        # https://github.com/networkx/networkx/issues/1230
+        return repr(self.get_stackalytics_user_name(line.split()[-1][1:-1]))
 
     def get_stackalytics_user_name(self, email):
         for user in self.stackalytics["users"]:
@@ -145,10 +145,12 @@ class ProcessedGitGraph(RawGitGraph):
             # sanity check, if any weights are 1, remove.
             if weighted[edge] > 0.99:
                 hit_list.add(edge)
-            # if author/reviewer has less then 3 core reviews, probably
+            # if reviewer has less then 3 core reviews, probably
             # not a core
-            if (edge[1].review_count < 3 or
-                    edge[0].review_count < 3):
+            if not edge[0].is_core():
+                hit_list.add(edge)
+            # if author core and less then x commits
+            if (not edge[1].is_core() and edge[1].patch_count < 10):
                 hit_list.add(edge)
         for hit in hit_list:
             del weighted[hit]

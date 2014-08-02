@@ -10,9 +10,9 @@ Reading the Graph
 =================
 
 
-Nodes: Core Reviewers
-Edges: Reviews from Core A of Core B's work.
- * Wider end of line is the target (Core B)
+Nodes: Reviewers (Red:Core, Blue: Other)
+Edges: Reviews from A of B's work.
+ * Wider end of line is the target (B)
  * Edge strength (strongest to weakest)
    * Green lines
    * Solid Blue

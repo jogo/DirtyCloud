@@ -14,10 +14,14 @@ def generate_graph(gitgraph, save, name):
         g.add_edge(edge[0], edge[1], weight=gitgraph.weighted_graph[edge])
 
     # node positions
-    pos = nx.spring_layout(g)
+    pos = nx.spring_layout(g, iterations=400)
 
-    # draw nodes
-    nx.draw_networkx_nodes(g, pos, node_size=700, node_shape='s')
+    # draw nodes. Core: red, other:green
+    node_color_map = ['r' if node.is_core() else 'b' for node in g.nodes()]
+    nx.draw_networkx_nodes(g, pos, node_color=node_color_map,
+                           node_size=700, node_shape='s')
+
+
 
     # draw edges
     alpha_map = [d['weight'] for (u, v, d) in g.edges(data=True)]
