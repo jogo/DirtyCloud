@@ -5,6 +5,20 @@ import random
 import subprocess
 
 
+class Node(object):
+    def __init__(self, name, core=True):
+        super(Node, self).__init__()
+        self.name = name
+        self.core = core
+        self.review_count = 0
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
+
+
 class RawGitGraph(object):
     """Extract gerrit +2 reviews from  git logs with notes.
 
@@ -15,6 +29,7 @@ class RawGitGraph(object):
     """
 
     def __init__(self, git_repo='/home/jogo/Develop/openstack/nova'):
+        # TODO move path to config file
         super(RawGitGraph, self).__init__()
         # up to date mailmap file
         # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
@@ -23,8 +38,8 @@ class RawGitGraph(object):
         with open('stackalytics.json') as data:
             self.stackalytics = json.load(data)
         self.git_repo = git_repo
+        self.nodes = dict()  # string:node_object
         self.commits = self.get_git_commits()
-        self.core_reviewers = self.get_core_reviewers()
         self.unweighted_graph = self.generate_raw_git_graph()
 
     def get_git_commits(self):
@@ -51,29 +66,19 @@ class RawGitGraph(object):
                 # something went wrong
                 continue
             # if author is a core reviewer
-            if edge[0][1] in self.core_reviewers:
+            if edge[0][1].review_count > 0:
                 edges = edges + edge
         return edges
-
-    def get_core_reviewers(self):
-        """Return a list of core reviewers with review count.
-
-        On all commits, not just patches by a core
-        """
-        cores = collections.defaultdict(int)
-        for commit in self.commits:
-            for core in self.get_core_reviewers_on_commit(commit):
-                cores[core] += 1
-        return dict(cores)
 
     def parse_commit(self, commit):
         """Extract author and +2 reviewers from commit."""
         edges = []
         for line in commit.split('\n'):
             if line.startswith("Author: "):
-                author = self.get_name_from_git_logs(line)
+                author = self.get_node(line)
                 break
         for reviewer in self.get_core_reviewers_on_commit(commit):
+            reviewer.review_count += 1
             edges.append((reviewer, author))
         return edges
 
@@ -86,8 +91,14 @@ class RawGitGraph(object):
                 # Make sure we ignore the git commit message
                 notes = True
             elif notes and "Code-Review+2: " in line:
-                reviewers.append(self.get_name_from_git_logs(line))
+                reviewers.append(self.get_node(line))
         return reviewers
+
+    def get_node(self, line):
+        name = self.get_name_from_git_logs(line)
+        if name not in self.nodes:
+            self.nodes[name] = Node(name)
+        return self.nodes[name]
 
     def get_name_from_git_logs(self, line):
         """Parse git log to find email."""
@@ -127,7 +138,7 @@ class ProcessedGitGraph(RawGitGraph):
         weighted = self.count_edges()
         # normalize weights by total reviews per reviewer
         for edge in weighted:
-            weighted[edge] = weighted[edge]/self.core_reviewers[edge[0]]
+            weighted[edge] = weighted[edge]/edge[0].review_count
         # clean up data
         hit_list = set([])
         for edge in weighted:
@@ -136,20 +147,12 @@ class ProcessedGitGraph(RawGitGraph):
                 hit_list.add(edge)
             # if author/reviewer has less then 3 core reviews, probably
             # not a core
-            if (self.core_reviewers[edge[1]] < 3 or
-                    self.core_reviewers[edge[0]] < 3):
-                hit_list.add(edge)
-            # if under 1%, drop
-            if weighted[edge] < 0.03:
+            if (edge[1].review_count < 3 or
+                    edge[0].review_count < 3):
                 hit_list.add(edge)
         for hit in hit_list:
             del weighted[hit]
         return weighted
-
-    def get_weight_range(self):
-        min_weight = min(self.weighted_graph.values())
-        max_weight = max(self.weighted_graph.values())
-        return (min_weight, max_weight)
 
     def get_strongest_edges(self, n=20):
         """"Return list with top n strongest edges with raw edge numbers."""
@@ -158,24 +161,17 @@ class ProcessedGitGraph(RawGitGraph):
         edge_count = self.count_edges()
         for key in self.weighted_graph.keys():
             reviewer = key[0]
-            raw[key] = (edge_count[key], self.core_reviewers[reviewer])
+            raw[key] = (edge_count[key], reviewer.review_count)
         # Sort dict by key
         strongest = sorted(raw.iteritems(), key=lambda x: (x[1][0]/x[1][1]),
                            reverse=True)
         return strongest[:n]
 
-
     def print_records(self):
-        print "weights"
-        print "min: %s, max: %s" % self.get_weight_range()
-        print
         print "((Reviewer, Author)): weight (hits/reviews))"
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x
             print "'%s': %f (%d/%d)" % (key, hits/reviews, hits, reviews, )
-
-
-
 
 
 class AnonimizedGitGraph(ProcessedGitGraph):
