@@ -6,10 +6,11 @@ import subprocess
 
 
 class Node(object):
-    def __init__(self, name):
+    def __init__(self, name, company, email):
         super(Node, self).__init__()
         self.name = name
-        self.emails = []
+        self.company = company
+        self.email = email
         self.review_count = 0
         self.patch_count = 0
 
@@ -18,7 +19,18 @@ class Node(object):
         return self.review_count > 3
 
     def __repr__(self):
-        return self.name
+        if self.company:
+            return "%s (%s)" % (self.name, self.company)
+        else:
+            domain = self.email.split('@')[1]
+            return "%s (%s)" % (self.name, domain)
+
+    def __str__(self):
+        if self.company:
+            return "%s\n(%s)" % (self.name, self.company)
+        else:
+            domain = self.email.split('@')[1]
+            return "%s\n(%s)" % (self.name, domain)
 
 
 class RawGitGraph(object):
@@ -68,12 +80,19 @@ class RawGitGraph(object):
             edges = edges + edge
         return edges
 
+    def get_node_by_email(self, email):
+        """Look up node by email."""
+        for node in self.nodes.values():
+            if email == node.email:
+                return node
+        return None
+
     def parse_commit(self, commit):
         """Extract author and +2 reviewers from commit."""
         edges = []
         for line in commit.split('\n'):
             if line.startswith("Author: "):
-                author = self.get_node(line)
+                author = self.get_node(line, author=True)
                 author.patch_count += 1
                 break
         for reviewer in self.get_core_reviewers_on_commit(commit):
@@ -93,26 +112,41 @@ class RawGitGraph(object):
                 reviewers.append(self.get_node(line))
         return reviewers
 
-    def get_node(self, line):
-        name = self.get_name_from_git_logs(line)
+    def get_node(self, line, author=False):
+        name, company, email = self.parse_git_logs(line)
         if name not in self.nodes:
-            self.nodes[name] = Node(name)
-        return self.nodes[name]
+            node = self.get_node_by_email(email)
+            if not node:
+                node = Node(name, company, email)
+                self.nodes[name] = node
+        else:
+            node = self.nodes[name]
+        if author:
+            # author emails are more accurate
+            node.email = email
+        if company and not node.company:
+            node.company = company
+        return node
 
-    def get_name_from_git_logs(self, line):
-        """Parse git log to find email."""
+    def parse_git_logs(self, line):
+        """Parse git log to find name and email."""
         # https://github.com/networkx/networkx/issues/1230
-        return repr(self.get_stackalytics_user_name(line.split()[-1][1:-1]))
+        email = line.split()[-1][1:-1]
+        name = ' '.join(line.split()[1:-1])
+        name_lookup, company = self.get_stackalytics_user_name(email)
+        if not name_lookup:
+            return repr(name), company, email
+        else:
+            return repr(name_lookup), company, email
 
     def get_stackalytics_user_name(self, email):
         for user in self.stackalytics["users"]:
-            if email in list(user['emails']):
+            if email.lower() in [a.lower() for a in list(user['emails'])]:
                 for company in user['companies']:
                     if not company['end_date']:
-                        return ("%s (%s)" % (user['user_name'],
-                                company['company_name']))
-                return user['user_name']
-        return email
+                        return (user['user_name'], company['company_name'])
+                return (user['user_name'], None)
+        return (None, None)
 
 
 class ProcessedGitGraph(RawGitGraph):
@@ -170,6 +204,7 @@ class ProcessedGitGraph(RawGitGraph):
         return strongest[:n]
 
     def print_records(self):
+        # TODO revise to use networkx (edges can be objects)
         print "((Reviewer, Author)): weight (hits/reviews))"
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x
@@ -184,10 +219,10 @@ class AnonimizedGitGraph(ProcessedGitGraph):
         self.email_map = dict()
         super(AnonimizedGitGraph, self).__init__(git_repo=git_repo)
 
-    def get_name_from_git_logs(self, line):
+    def parse_git_logs(self, line):
         """Parse git log to find email."""
-        email = super(AnonimizedGitGraph, self).get_name_from_git_logs(line)
-        return self.anonimize_email(email)
+        email = super(AnonimizedGitGraph, self).parse_git_logs(line)
+        return self.anonimize_email(email), None, None
 
     def anonimize_email(self, email):
         # anonimize

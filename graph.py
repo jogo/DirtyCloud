@@ -14,7 +14,7 @@ def generate_graph(gitgraph, save, name):
         g.add_edge(edge[0], edge[1], weight=gitgraph.weighted_graph[edge])
 
     # node positions
-    pos = nx.spring_layout(g, iterations=400)
+    pos = nx.spring_layout(g, iterations=4000)
 
     # draw nodes. Core: red, other:green
     node_color_map = ['r' if node.is_core() else 'b' for node in g.nodes()]
