@@ -1,3 +1,16 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import json
 import os
@@ -135,9 +148,9 @@ class RawGitGraph(object):
         name = ' '.join(line.split()[1:-1])
         name_lookup, company = self.get_stackalytics_user_name(email)
         if not name_lookup:
-            return repr(name), company, email
+            return name, company, email
         else:
-            return repr(name_lookup), company, email
+            return name_lookup, company, email
 
     def get_stackalytics_user_name(self, email):
         for user in self.stackalytics["users"]:
@@ -172,7 +185,7 @@ class ProcessedGitGraph(RawGitGraph):
         weighted = self.count_edges()
         # normalize weights by total reviews per reviewer
         for edge in weighted:
-            weighted[edge] = weighted[edge]/edge[0].review_count
+            weighted[edge] = weighted[edge] / edge[0].review_count
         # clean up data
         hit_list = set([])
         for edge in weighted:
@@ -199,7 +212,7 @@ class ProcessedGitGraph(RawGitGraph):
             reviewer = key[0]
             raw[key] = (edge_count[key], reviewer.review_count)
         # Sort dict by key
-        strongest = sorted(raw.iteritems(), key=lambda x: (x[1][0]/x[1][1]),
+        strongest = sorted(raw.iteritems(), key=lambda x: (x[1][0] / x[1][1]),
                            reverse=True)
         return strongest[:n]
 
@@ -208,7 +221,7 @@ class ProcessedGitGraph(RawGitGraph):
         print "((Reviewer, Author)): weight (hits/reviews))"
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x
-            print "'%s': %f (%d/%d)" % (key, hits/reviews, hits, reviews, )
+            print "'%s': %f (%d/%d)" % (key, hits / reviews, hits, reviews, )
 
 
 class AnonimizedGitGraph(ProcessedGitGraph):
@@ -236,6 +249,6 @@ class AnonimizedGitGraph(ProcessedGitGraph):
             # no more random names left in space
             raise Exception("No more random names left")
         while True:
-            rand = str(int(random.random()*n))
+            rand = str(int(random.random() * n))
             if rand not in self.email_map.values():
                 return rand

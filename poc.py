@@ -1,3 +1,16 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -42,7 +55,7 @@ node_color_map = ['r' if node.core else 'g' for node in g.nodes()]
 nx.draw_networkx_nodes(g, pos, node_color=node_color_map, node_size=700)
 
 # draw edges
-edge_weights = [d['weight']*10 for (u, v, d) in g.edges(data=True)]
+edge_weights = [d['weight'] * 10 for (u, v, d) in g.edges(data=True)]
 nx.draw_networkx_edges(g, pos, arrows=True, width=edge_weights,
                        edge_color=edge_weights, edge_cmap=plt.cm.Blues)
 
