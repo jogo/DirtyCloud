@@ -46,7 +46,8 @@ def generate_graph(gitgraph, save, name):
 
     # draw labels
     nx.draw_networkx_labels(g, pos, font_size=10, font_family='sans-serif')
-
+    #from networkx.readwrite import gexf
+    #gexf.write_gexf(g,'foo.gexf')
     plt.axis('off')
     if save:
         plt.savefig("%s.png" % name)
@@ -69,10 +70,7 @@ def main():
     # TODO don't hard code this
     repo_path = '/home/jogo/Develop/' + options.repository
 
-    if options.pseudonyms:
-        gitgraph = gitlogs.AnonimizedGitGraph(git_repo=repo_path)
-    else:
-        gitgraph = gitlogs.ProcessedGitGraph(git_repo=repo_path)
+    gitgraph = gitlogs.ProcessedGitGraph(git_repo=repo_path, pseudonyms=options.pseudonyms)
 
     gitgraph.print_records()
 

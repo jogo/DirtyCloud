@@ -14,14 +14,17 @@
 import collections
 import json
 import os
-import random
 import subprocess
+
+import names
+
+unique_names = []
 
 
 class Node(object):
     def __init__(self, name, company, email):
         super(Node, self).__init__()
-        self.name = name
+        self.name = repr(name)
         self.company = company
         self.email = email
         self.review_count = 0
@@ -46,6 +49,24 @@ class Node(object):
             return "%s\n(%s)" % (self.name, domain)
 
 
+class AnonNode(Node):
+    def __init__(self, name, company, email):
+        super(AnonNode, self).__init__(name, company, email)
+        unique = False
+        while not unique:
+            random_name = names.get_first_name()
+            if random_name not in unique_names:
+                unique = True
+                unique_names.append(random_name)
+                self.fake_name = random_name
+
+    def __repr__(self):
+        return "%s" % self.fake_name
+
+    def __str__(self):
+        return "%s" % self.fake_name
+
+
 class RawGitGraph(object):
     """Extract gerrit +2 reviews from  git logs with notes.
 
@@ -53,7 +74,7 @@ class RawGitGraph(object):
     Generates a list of edges: (Reviewer, Author)
     """
 
-    def __init__(self, git_repo='/home/jogo/Develop/openstack/nova'):
+    def __init__(self, git_repo='/home/jogo/Develop/openstack/nova', pseudonyms=False):
         # TODO move path to config file
         super(RawGitGraph, self).__init__()
         # up to date mailmap file
@@ -64,6 +85,10 @@ class RawGitGraph(object):
             self.stackalytics = json.load(data)
         self.git_repo = git_repo
         self.nodes = dict()  # string:node_object
+        if pseudonyms:
+            self.node_class = AnonNode
+        else:
+            self.node_class = Node
         self.commits = self.get_git_commits()
         self.unweighted_graph = self.generate_raw_git_graph()
 
@@ -130,7 +155,7 @@ class RawGitGraph(object):
         if name not in self.nodes:
             node = self.get_node_by_email(email)
             if not node:
-                node = Node(name, company, email)
+                node = self.node_class(name, company, email)
                 self.nodes[name] = node
         else:
             node = self.nodes[name]
@@ -163,8 +188,8 @@ class RawGitGraph(object):
 
 
 class ProcessedGitGraph(RawGitGraph):
-    def __init__(self, git_repo):
-        super(ProcessedGitGraph, self).__init__(git_repo=git_repo)
+    def __init__(self, git_repo, pseudonyms=False):
+        super(ProcessedGitGraph, self).__init__(git_repo=git_repo, pseudonyms=pseudonyms)
         self.weighted_graph = self.weight_graph()
 
     def count_edges(self):
@@ -222,33 +247,3 @@ class ProcessedGitGraph(RawGitGraph):
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x
             print "'%s': %f (%d/%d)" % (key, hits / reviews, hits, reviews, )
-
-
-class AnonimizedGitGraph(ProcessedGitGraph):
-    """Replace emails with pseudonyms."""
-
-    def __init__(self, git_repo):
-        random.seed()
-        self.email_map = dict()
-        super(AnonimizedGitGraph, self).__init__(git_repo=git_repo)
-
-    def parse_git_logs(self, line):
-        """Parse git log to find email."""
-        email = super(AnonimizedGitGraph, self).parse_git_logs(line)
-        return self.anonimize_email(email), None, None
-
-    def anonimize_email(self, email):
-        # anonimize
-        if email not in self.email_map:
-            self.email_map[email] = self.get_unique_random_name()
-        return self.email_map[email]
-
-    def get_unique_random_name(self, n=1000):
-        # Generate up to n random names
-        if len(self.email_map) is n:
-            # no more random names left in space
-            raise Exception("No more random names left")
-        while True:
-            rand = str(int(random.random() * n))
-            if rand not in self.email_map.values():
-                return rand
