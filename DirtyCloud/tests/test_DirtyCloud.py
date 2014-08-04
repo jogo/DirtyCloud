@@ -12,17 +12,19 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""
-test_DirtyCloud
-----------------------------------
-
-Tests for `DirtyCloud` module.
-"""
-
+from DirtyCloud import gitlogs
 from DirtyCloud.tests import base
 
 
-class TestDirtycloud(base.TestCase):
+class TestNode(base.TestCase):
+    def setUp(self):
+        super(TestNode, self).setUp()
+        self.node = gitlogs.Node("name", "company", "email")
 
-    def test_something(self):
-        pass
+    def test_is_core(self):
+        self.node.review_count = 4
+        self.assertTrue(self.node.is_core())
+
+    def test_is_not_core(self):
+        self.node.review_count = 1
+        self.assertFalse(self.node.is_core())
