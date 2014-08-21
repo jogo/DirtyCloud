@@ -18,7 +18,7 @@ import optparse
 import matplotlib.pyplot as plt
 import networkx as nx
 
-from DirtyCloud import gitlogs
+from purpleyard import gitlogs
 
 
 def generate_graph(gitgraph, save, name):

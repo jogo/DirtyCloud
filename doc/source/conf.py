@@ -36,7 +36,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'DirtyCloud'
+project = u'purplecloud'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True

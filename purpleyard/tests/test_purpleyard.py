@@ -12,8 +12,19 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import pbr.version
+from purpleyard import gitlogs
+from purpleyard.tests import base
 
 
-__version__ = pbr.version.VersionInfo(
-    'DirtyCloud').version_string()
+class TestNode(base.TestCase):
+    def setUp(self):
+        super(TestNode, self).setUp()
+        self.node = gitlogs.Node("name", "company", "email")
+
+    def test_is_core(self):
+        self.node.review_count = 4
+        self.assertTrue(self.node.is_core())
+
+    def test_is_not_core(self):
+        self.node.review_count = 1
+        self.assertFalse(self.node.is_core())
