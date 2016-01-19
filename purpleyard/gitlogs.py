@@ -96,7 +96,7 @@ class RawGitGraph(object):
         # gerrit ref for notes
         command = ("git log --notes=refs/notes/review "
                    "--no-merges --since=6.month")
-        log = subprocess.check_output(command.split(' '))
+        log = subprocess.check_output(command.split(' ')).decode("utf-8")
         os.chdir(cwd)
         commits = log.split("\ncommit ")
         return commits
@@ -234,7 +234,7 @@ class ProcessedGitGraph(RawGitGraph):
             reviewer = key[0]
             raw[key] = (edge_count[key], reviewer.review_count)
         # Sort dict by key
-        strongest = sorted(raw.iteritems(), key=lambda x: (x[1][0] / x[1][1]),
+        strongest = sorted(raw.items(), key=lambda x: (x[1][0] / x[1][1]),
                            reverse=True)
         return strongest[:n]
 

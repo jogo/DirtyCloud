@@ -49,7 +49,7 @@ def generate_graph(gitgraph, save, name):
     # draw edges
     alpha_map = [d['weight'] for (u, v, d) in g.edges(data=True)]
     max_weight = max(alpha_map)
-    alpha_map = map(lambda x: x / max_weight, alpha_map)
+    alpha_map = list(map(lambda x: x / max_weight, alpha_map))
     i = 0
     for edge in g.edges(data=True):
         nx.draw_networkx_edges(g, pos, edgelist=[edge], arrows=True, width=3,
