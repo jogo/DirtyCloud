@@ -46,8 +46,8 @@ def generate_graph(gitgraph, save, name):
 
     # draw labels
     nx.draw_networkx_labels(g, pos, font_size=10, font_family='sans-serif')
-    #from networkx.readwrite import gexf
-    #gexf.write_gexf(g,'foo.gexf')
+    # from networkx.readwrite import gexf
+    # gexf.write_gexf(g,'foo.gexf')
     plt.axis('off')
     if save:
         plt.savefig("%s.png" % name)
