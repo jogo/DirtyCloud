@@ -11,8 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import requests
+
 import collections
-import json
 import os
 import subprocess
 
@@ -79,10 +80,8 @@ class RawGitGraph(object):
         super(RawGitGraph, self).__init__()
         # up to date mailmap file
         # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
-        # TODO(jogo) download new version if internet, else look for local copy
-
-        with open('stackalytics.json') as data:
-            self.stackalytics = json.load(data)
+        r = requests.get('http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json')
+        self.stackalytics = r.json()
         self.git_repo = git_repo
         self.nodes = dict()  # string:node_object
         if pseudonyms:
