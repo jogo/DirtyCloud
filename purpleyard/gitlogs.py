@@ -241,7 +241,7 @@ class ProcessedGitGraph(RawGitGraph):
 
     def print_records(self):
         # TODO revise to use networkx (edges can be objects)
-        print "((Reviewer, Author)): weight (hits/reviews))"
+        print("((Reviewer, Author)): weight (hits/reviews))")
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x
-            print "'%s': %f (%d/%d)" % (key, hits / reviews, hits, reviews, )
+            print("'%s': %f (%d/%d)" % (key, hits / reviews, hits, reviews, ))

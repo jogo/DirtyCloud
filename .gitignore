@@ -5,3 +5,6 @@ stackalytics.json
 *.egg-info
 .testrepository/
 doc/build
+AUTHORS
+ChangeLog
+doc/source/api

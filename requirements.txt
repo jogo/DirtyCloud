@@ -1,5 +1,5 @@
-pbr>=0.6,!=0.7,<1.0
-#matplotlib
+pbr>=1.6
+matplotlib
 networkx
 names
 requests

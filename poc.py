@@ -64,7 +64,7 @@ nx.draw_networkx_edges(g, pos, arrows=True, width=edge_weights,
 top_edges = sorted(g.edges_iter(data=True), key=lambda x: x[2]['weight'],
                    reverse=True)
 for edge in top_edges[:-2]:
-    print edge
+    print(edge)
 
 # draw labels
 nx.draw_networkx_labels(g, pos, font_size=20, font_family='sans-serif')

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ConfigParser
+import configparser
 import optparse
 
 import matplotlib.pyplot as plt
@@ -23,6 +23,13 @@ from purpleyard import gitlogs
 
 
 def generate_graph(gitgraph, save, name):
+    """Generate a graph of reviews.
+
+    Args:
+        gitgraph (): ProcessedGitGraph
+        save (bool): True to safe graph as a png file
+        name (bool): repo name
+    """
     g = nx.DiGraph()
     for edge in gitgraph.weighted_graph:
         g.add_edge(edge[0], edge[1], weight=gitgraph.weighted_graph[edge])
@@ -71,7 +78,7 @@ def main():
                          help="Just print records, don't generate the graph")
     options, args = optparser.parse_args()
 
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.read('purple.ini')
 
     repo_path = config.get("config", "git_path") + options.repository
