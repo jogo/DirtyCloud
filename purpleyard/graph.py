@@ -70,7 +70,8 @@ def main():
     config.read('purple.ini')
 
     repo_path = config.get("config", "git_path") + options.repository
-    gitgraph = gitlogs.GitGraph(git_repo=repo_path)
+    gitgraph = gitlogs.GerritGraph(git_repo=repo_path, repo_name=options.repository)
+    # gitgraph = gitlogs.GitGraph(git_repo=repo_path)
     gitgraph.print_records()
     generate_graph(gitgraph,
                    options.repository.replace("/", "_"))

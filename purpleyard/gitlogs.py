@@ -12,9 +12,12 @@
 # limitations under the License.
 
 import requests
+import requests_futures.sessions
 
+import json
 import os
 import subprocess
+import urllib.parse
 
 unique_names = []
 
@@ -45,9 +48,11 @@ class Node(object):
     def __str__(self):
         if self.company:
             return "%s (%s)" % (self.name, self.company)
-        else:
+        elif self.email and '@' in self.email:
             domain = self.email.split('@')[1]
             return "%s (%s)" % (self.name, domain)
+        else:
+            return "%s" % self.name
 
 
 class Edge(object):
@@ -131,6 +136,87 @@ class Graph(object):
                                         edge.count, edge.reviewer.review_count))
 
 
+class GerritGraph(Graph):
+    def __init__(self, git_repo, repo_name):
+        super(GerritGraph, self).__init__(git_repo=git_repo)
+        # TODO emit some sort of progress information
+        self.change_ids = self.get_git_change_ids()
+        self.repo_name = repo_name
+        self.session = requests_futures.sessions.FuturesSession(max_workers=2)
+        self.populate_graph()
+        self.clean_edges()
+
+    def get_git_change_ids(self):
+        """Get git log with gerrit notes."""
+        cwd = os.getcwd()
+        os.chdir(self.git_repo)
+        # gerrit ref for notes
+        command = ("git log --no-merges --since=6.month origin/master")
+        log = subprocess.check_output(command.split(' ')).decode("utf-8")
+        os.chdir(cwd)
+        change_ids = []
+        change_id = "Change-Id: "
+        for commit in log.split("\ncommit "):
+            for line in commit.split('\n'):
+                if line.strip().startswith(change_id):
+                    change_ids.append(line.split(change_id)[1])
+        return change_ids
+
+    def populate_graph(self):
+        """Fetch author and core reviewers who +2ed any revision.
+
+        Pass in list of change_ids for a single project.
+        Track users by email.
+        """
+        futures = []
+        for change_id in self.change_ids:
+            url = ("https://review.openstack.org:443/changes/%s~master~%s/detail"
+                   % (urllib.parse.quote_plus(self.repo_name), change_id))
+            future = self.session.get(url)
+            futures.append(future)
+        for future in futures:
+            r = future.result()
+            try:
+                if r.text.startswith("Not found: "):
+                    # Something went wrong, found a commit that doesn't have a record of
+                    # being submitted to master.
+                    return None
+                data = json.loads(r.text[4:])
+            except ValueError:
+                print(r.text)
+                raise
+            author = data['owner']
+            core_reviewers = []
+            for message in data['messages']:
+                if "Code-Review+2" in message['message']:
+                    core_reviewers.append(message['author'])
+
+            # TODO add company support (move company lookup into Node)
+            author_node = self.get_node(author['name'], None, author.get('email'), author=True)
+            author_node.patch_count += 1
+            for reviewer in core_reviewers:
+                reviewer_node = self.get_node(reviewer['name'], None, reviewer.get('email'))
+                reviewer_node.review_count += 1
+                self.increment_edge(reviewer_node, author_node)
+
+    def clean_edges(self):
+        # TODO make this more robust
+        # Adjust for gerrit
+        hit_list = []
+        for edge in self.edges:
+            # sanity check, if any weights are 1, remove.
+            if edge.score() > 0.99:
+                hit_list.append(edge)
+            elif not edge.reviewer.is_core():
+                hit_list.append(edge)
+            # if author core and less then x commits
+            elif (not edge.author.is_core() and edge.author.patch_count < 10):
+                hit_list.append(edge)
+        for hit in hit_list:
+            self.edges.remove(hit)
+
+
+# TODO decide if git only mode should be kept
 class GitGraph(Graph):
     """Extract gerrit +2 reviews from  git logs with notes.
 
