@@ -20,14 +20,11 @@ import optparse
 from purpleyard import gitlogs
 
 
-# TODO convert to emit JSON and use D3 (see d3.html)
-# TODO cleanup if d3 looks good
-def generate_graph(gitgraph, save, name):
-    """Generate a json file for graphing in d3 .
+def generate_graph(gitgraph, name):
+    """Generate a json file for graphing in d3.
 
     Args:
         gitgraph (): ProcessedGitGraph
-        save (bool): True to safe graph as a png file
         name (bool): repo name
     """
     # convert to list of nodes and edges
@@ -71,12 +68,6 @@ def main():
     optparser.add_option('-p', '--pseudonyms',
                          action='store_true',
                          help='Use pseudonyms instead of email addresses')
-    optparser.add_option('-s', '--save',
-                         action='store_true',
-                         help='Save image')
-    optparser.add_option('-t', '--no-graph',
-                         action='store_true',
-                         help="Just print records, don't generate the graph")
     options, args = optparser.parse_args()
 
     config = configparser.ConfigParser()
@@ -88,10 +79,8 @@ def main():
 
     gitgraph.print_records()
 
-    if not options.no_graph:
-        generate_graph(gitgraph,
-                       options.save,
-                       options.repository.replace("/", "_"))
+    generate_graph(gitgraph,
+                   options.repository.replace("/", "_"))
 
 if __name__ == '__main__':
     main()

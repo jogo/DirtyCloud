@@ -239,7 +239,6 @@ class ProcessedGitGraph(RawGitGraph):
         return strongest[:n]
 
     def print_records(self):
-        # TODO revise to use networkx (edges can be objects)
         print("((Reviewer, Author)): weight (hits/reviews))")
         for x in self.get_strongest_edges():
             key, (hits, reviews) = x

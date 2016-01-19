@@ -22,7 +22,7 @@ class TestNode(base.TestCase):
         self.node = gitlogs.Node("name", "company", "email")
 
     def test_is_core(self):
-        self.node.review_count = 4
+        self.node.review_count = 25
         self.assertTrue(self.node.is_core())
 
     def test_is_not_core(self):
