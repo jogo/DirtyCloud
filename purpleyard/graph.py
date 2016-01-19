@@ -30,7 +30,7 @@ def generate_graph(gitgraph, name):
     # convert to list of nodes and edges
     nodes = []
     edges = []
-    for edge in gitgraph.get_strongest_edges():
+    for edge in gitgraph.get_strongest_edges(10):
         if edge.reviewer not in nodes:
             nodes.append(edge.reviewer)
         if edge.author not in nodes:

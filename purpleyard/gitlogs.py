@@ -19,16 +19,16 @@ import os
 import subprocess
 import urllib.parse
 
-unique_names = []
-
 
 class Node(object):
-    def __init__(self, name, company, email):
+    # Fetch up to date mailmap file
+    r = requests.get('http://git.openstack.org/cgit/openstack/stackalytics/plain/etc/default_data.json')
+    stackalytics = r.json()
+
+    def __init__(self, name, email):
         super(Node, self).__init__()
         self.name = name
-        self.company = company
         self.email = email
-        # TODO username
         self.review_count = 0
         self.patch_count = 0
 
@@ -49,10 +49,32 @@ class Node(object):
         if self.company:
             return "%s (%s)" % (self.name, self.company)
         elif self.email and '@' in self.email:
-            domain = self.email.split('@')[1]
+            domain = self.domain
             return "%s (%s)" % (self.name, domain)
         else:
             return "%s" % self.name
+
+    @property
+    def domain(self):
+        """email domain"""
+        return self.email.split('@')[1]
+
+    @property
+    def company(self):
+        if not self.email:
+            return None
+        # check users
+        for user in self.stackalytics["users"]:
+            if self.email.lower() in [a.lower() for a in list(user['emails'])]:
+                for company in user['companies']:
+                    if not company['end_date']:
+                        return company['company_name']
+        # check email domains
+        for company in self.stackalytics["companies"]:
+            if self.domain in company["domains"]:
+                return company["company_name"]
+
+        return None
 
 
 class Edge(object):
@@ -72,9 +94,6 @@ class Edge(object):
 class Graph(object):
     def __init__(self, git_repo):
         super(Graph, self).__init__()
-        # Fetch up to date mailmap file
-        r = requests.get('http://git.openstack.org/cgit/openstack/stackalytics/plain/etc/default_data.json')
-        self.stackalytics = r.json()
         self.git_repo = git_repo
         self.nodes = dict()  # string:node_object
         self.edges = []
@@ -97,37 +116,26 @@ class Graph(object):
         self.edges.append(edge)
         return edge
 
-    def get_node(self, name, company, email, author=False):
+    def get_node(self, name, email):
         if name not in self.nodes:
             node = self.get_node_by_email(email)
             if not node:
-                node = Node(name, company, email)
+                node = Node(name, email)
                 self.nodes[name] = node
         else:
             node = self.nodes[name]
-        if author:
-            # author emails are more accurate
+        if email and not node.email:
             node.email = email
-        if company and not node.company:
-            node.company = company
         return node
 
-    def get_stackalytics_user_name(self, email):
-        for user in self.stackalytics["users"]:
-            if email.lower() in [a.lower() for a in list(user['emails'])]:
-                for company in user['companies']:
-                    if not company['end_date']:
-                        return (user['user_name'], company['company_name'])
-                return (user['user_name'], None)
-        return (None, None)
-
-    def get_strongest_edges(self, n=20):
+    def get_strongest_edges(self, percent=10):
         """"Return list with top n strongest edges with raw edge numbers."""
         # Sort dict by key
         strongest = sorted(self.edges,
                            key=lambda edge: edge.score(),
                            reverse=True)
-        return strongest[:n]
+        strongest = filter(lambda edge: edge.score()*100>percent, strongest)
+        return strongest
 
     def print_records(self):
         print("((Reviewer, Author)): weight (hits/reviews))")
@@ -139,8 +147,8 @@ class Graph(object):
 class GerritGraph(Graph):
     def __init__(self, git_repo, repo_name):
         super(GerritGraph, self).__init__(git_repo=git_repo)
-        # TODO emit some sort of progress information
         self.change_ids = self.get_git_change_ids()
+        print("found %s changes" % len(self.change_ids))
         self.repo_name = repo_name
         self.session = requests_futures.sessions.FuturesSession(max_workers=2)
         self.populate_graph()
@@ -168,19 +176,23 @@ class GerritGraph(Graph):
         Pass in list of change_ids for a single project.
         Track users by email.
         """
+        total = len(self.change_ids)
         futures = []
         for change_id in self.change_ids:
             url = ("https://review.openstack.org:443/changes/%s~master~%s/detail"
                    % (urllib.parse.quote_plus(self.repo_name), change_id))
             future = self.session.get(url)
             futures.append(future)
-        for future in futures:
+        for i, future in enumerate(futures):
+            if i > 0 and i % 100 == 0:
+                print("%0d%% done ..." % (float(i) / total * 100))
             r = future.result()
             try:
                 if r.text.startswith("Not found: "):
                     # Something went wrong, found a commit that doesn't have a record of
                     # being submitted to master.
-                    return None
+                    print("change id not found, skipping")
+                    continue
                 data = json.loads(r.text[4:])
             except ValueError:
                 print(r.text)
@@ -191,100 +203,15 @@ class GerritGraph(Graph):
                 if "Code-Review+2" in message['message']:
                     core_reviewers.append(message['author'])
 
-            # TODO add company support (move company lookup into Node)
-            author_node = self.get_node(author['name'], None, author.get('email'), author=True)
+            author_node = self.get_node(author['name'], author.get('email'))
             author_node.patch_count += 1
             for reviewer in core_reviewers:
-                reviewer_node = self.get_node(reviewer['name'], None, reviewer.get('email'))
+                reviewer_node = self.get_node(reviewer['name'], reviewer.get('email'))
                 reviewer_node.review_count += 1
                 self.increment_edge(reviewer_node, author_node)
 
     def clean_edges(self):
-        # TODO make this more robust
         # Adjust for gerrit
-        hit_list = []
-        for edge in self.edges:
-            # sanity check, if any weights are 1, remove.
-            if edge.score() > 0.99:
-                hit_list.append(edge)
-            elif not edge.reviewer.is_core():
-                hit_list.append(edge)
-            # if author core and less then x commits
-            elif (not edge.author.is_core() and edge.author.patch_count < 10):
-                hit_list.append(edge)
-        for hit in hit_list:
-            self.edges.remove(hit)
-
-
-# TODO decide if git only mode should be kept
-class GitGraph(Graph):
-    """Extract gerrit +2 reviews from  git logs with notes.
-
-    Core reviewer defined as someone who can do "Code-Review+2: ".
-    Generates a list of edges: (Reviewer, Author)
-    """
-
-    def __init__(self, git_repo):
-        super(GitGraph, self).__init__(git_repo=git_repo)
-        self.commits = self.get_git_commits()
-        self.generate_edges()
-        self.clean_edges()
-
-    def get_git_commits(self):
-        """Get git log with gerrit notes."""
-        cwd = os.getcwd()
-        os.chdir(self.git_repo)
-        # gerrit ref for notes
-        command = ("git log --notes=refs/notes/review "
-                   "--no-merges --since=6.month")
-        log = subprocess.check_output(command.split(' ')).decode("utf-8")
-        os.chdir(cwd)
-        commits = log.split("\ncommit ")
-        return commits
-
-    def generate_edges(self):
-        """Generate list of edges based on git logs."""
-        for commit in self.commits:
-            self.parse_commit(commit)
-
-    def parse_commit(self, commit):
-        """Extract author and +2 reviewers from commit."""
-        for line in commit.split('\n'):
-            if line.startswith("Author: "):
-                name, company, email = self.parse_git_logs(line)
-                author = self.get_node(name, company, email, author=True)
-                author.patch_count += 1
-                break
-        for reviewer in self.get_core_reviewers_on_commit(commit):
-            reviewer.review_count += 1
-            self.increment_edge(reviewer, author)
-
-    def get_core_reviewers_on_commit(self, commit):
-        """Extract core reviewers on a specific commit."""
-        reviewers = []
-        notes = False
-        for line in commit.split('\n'):
-            if line.strip() == "Notes (review):":
-                # Make sure we ignore the git commit message
-                notes = True
-            elif notes and "Code-Review+2: " in line:
-                name, company, email = self.parse_git_logs(line)
-                reviewers.append(self.get_node(name, company, email))
-        return reviewers
-
-    def parse_git_logs(self, line):
-        """Parse git log to find name and email."""
-        # https://github.com/networkx/networkx/issues/1230
-        email = line.split()[-1][1:-1]
-        name = ' '.join(line.split()[1:-1])
-        name_lookup, company = self.get_stackalytics_user_name(email)
-        if not name_lookup:
-            return name, company, email
-        else:
-            return name_lookup, company, email
-
-    def clean_edges(self):
-        # TODO make this more robust
         hit_list = []
         for edge in self.edges:
             # sanity check, if any weights are 1, remove.
