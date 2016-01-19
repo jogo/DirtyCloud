@@ -75,8 +75,7 @@ class RawGitGraph(object):
     Generates a list of edges: (Reviewer, Author)
     """
 
-    def __init__(self, git_repo='/home/jogo/Develop/openstack/nova', pseudonyms=False):
-        # TODO move path to config file
+    def __init__(self, git_repo, pseudonyms=False):
         super(RawGitGraph, self).__init__()
         # up to date mailmap file
         # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json

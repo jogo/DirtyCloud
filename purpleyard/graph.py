@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ConfigParser
 import optparse
 
 import matplotlib.pyplot as plt
@@ -65,18 +66,24 @@ def main():
     optparser.add_option('-s', '--save',
                          action='store_true',
                          help='Save image')
+    optparser.add_option('-t', '--no-graph',
+                         action='store_true',
+                         help="Just print records, don't generate the graph")
     options, args = optparser.parse_args()
 
-    # TODO don't hard code this
-    repo_path = '/home/jogo/Develop/' + options.repository
+    config = ConfigParser.ConfigParser()
+    config.read('purple.ini')
+
+    repo_path = config.get("config", "git_path") + options.repository
 
     gitgraph = gitlogs.ProcessedGitGraph(git_repo=repo_path, pseudonyms=options.pseudonyms)
 
     gitgraph.print_records()
 
-    generate_graph(gitgraph,
-                   options.save,
-                   options.repository.replace("/", "_"))
+    if not options.no_graph:
+        generate_graph(gitgraph,
+                       options.save,
+                       options.repository.replace("/", "_"))
 
 if __name__ == '__main__':
     main()
