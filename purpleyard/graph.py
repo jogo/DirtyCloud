@@ -16,6 +16,10 @@
 import configparser
 import optparse
 
+import matplotlib
+# Don't load gtk backend
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
