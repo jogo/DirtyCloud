@@ -40,7 +40,7 @@ var force = d3.layout.force()
     .nodes(nodes)
     .links(links)
     .size([width, height])
-    .linkDistance(200)
+    .linkDistance(100)
     .charge(-900)
     .on("tick", tick)
     .start();
@@ -59,18 +59,20 @@ function redraw() {
 }
 
 // build the arrow.
-svg.append("svg:defs").selectAll("marker")
-    .data(["end"])      // Different link/path types can be defined here
-  .enter().append("svg:marker")    // This section adds in the arrows
-    .attr("id", String)
+svg.append("defs").selectAll("marker")
+    .data(["end"])
+  .enter().append("marker")
+    .attr("id", function(d) { return d; })
     .attr("viewBox", "0 -5 10 10")
-    .attr("refX", 15)
-    .attr("refY", -1.5)
+    .attr("refX", 16)
+    .attr("refY", 0)
     .attr("markerWidth", 6)
     .attr("markerHeight", 6)
     .attr("orient", "auto")
-  .append("svg:path")
-    .attr("d", "M0,-5L10,0L0,5");
+  .append("path")
+    .attr("d", "M0,-5L10,0L0,5 L10,0 L0, -5")
+    .style("stroke", "#4679BD")
+    .style("opacity", "0.6");
 
 var max_value  = d3.max(force.links())
 
@@ -79,7 +81,7 @@ var tip = d3.tip()
     .attr('class', 'd3-tip')
     .offset([-10, 0])
     .html(function (d) {
-    return d.value.toFixed(2);}
+    return Math.round(d.value * 100) + "%";}
 )
 svg.call(tip);
 
