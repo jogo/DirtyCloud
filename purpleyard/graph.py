@@ -14,56 +14,53 @@
 # limitations under the License.
 
 import configparser
+import json
 import optparse
-
-import matplotlib
-# Don't load gtk backend
-matplotlib.use('Agg')
-
-import matplotlib.pyplot as plt
-import networkx as nx
 
 from purpleyard import gitlogs
 
 
+# TODO convert to emit JSON and use D3 (see d3.html)
+# TODO cleanup if d3 looks good
 def generate_graph(gitgraph, save, name):
-    """Generate a graph of reviews.
+    """Generate a json file for graphing in d3 .
 
     Args:
         gitgraph (): ProcessedGitGraph
         save (bool): True to safe graph as a png file
         name (bool): repo name
     """
-    g = nx.DiGraph()
-    for edge in gitgraph.weighted_graph:
-        g.add_edge(edge[0], edge[1], weight=gitgraph.weighted_graph[edge])
+    # convert to list of nodes and edges
+    nodes = []
+    edges = []
+    for edge in gitgraph.get_strongest_edges():
+        (reviewer, author), (hits, reviews) = edge
+        if reviewer not in nodes:
+            nodes.append(reviewer)
+        if author not in nodes:
+            nodes.append(author)
 
-    # node positions
-    pos = nx.spring_layout(g)
+        edges.append({"source": nodes.index(reviewer),
+                      "target": nodes.index(author),
+                      "value": hits / reviews})
 
-    # draw nodes. Core: red, other:green
-    node_color_map = ['r' if node.is_core() else 'b' for node in g.nodes()]
-    nx.draw_networkx_nodes(g, pos, node_color=node_color_map,
-                           node_size=700, node_shape='s')
+    # convert node to target format
+    json_nodes = []
+    orgs = []
+    for node in nodes:
+        if not node.company:
+            # use email
+            if node.email not in orgs:
+                orgs.append(node.email)
+            json_nodes.append({'name': node.name, 'group': orgs.index(node.email)})
+        else:
+            if node.company not in orgs:
+                orgs.append(node.company)
+            json_nodes.append({'name': node.name, 'group': orgs.index(node.company)})
 
-    # draw edges
-    alpha_map = [d['weight'] for (u, v, d) in g.edges(data=True)]
-    max_weight = max(alpha_map)
-    alpha_map = list(map(lambda x: x / max_weight, alpha_map))
-    i = 0
-    for edge in g.edges(data=True):
-        nx.draw_networkx_edges(g, pos, edgelist=[edge], arrows=True, width=3,
-                               alpha=alpha_map[i])
-        i += 1
-
-    # draw labels
-    nx.draw_networkx_labels(g, pos, font_size=10, font_family='sans-serif')
-    # from networkx.readwrite import gexf
-    # gexf.write_gexf(g,'foo.gexf')
-    plt.axis('off')
-    if save:
-        plt.savefig("%s.png" % name)
-    plt.show()
+    # convert to json
+    with open('git.json', 'w') as f:
+        json.dump({"links": edges, "nodes": json_nodes}, f)
 
 
 def main():

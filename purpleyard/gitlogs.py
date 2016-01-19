@@ -25,15 +25,17 @@ unique_names = []
 class Node(object):
     def __init__(self, name, company, email):
         super(Node, self).__init__()
-        self.name = repr(name)
+        self.name = name
         self.company = company
         self.email = email
         self.review_count = 0
         self.patch_count = 0
 
     def is_core(self):
+        # if reviewer has less then 3 core reviews, probably
+        # not a core
         # Since currently only using git notes this isn't precise
-        return self.review_count > 3
+        return self.review_count > 20
 
     def __repr__(self):
         if self.company:
@@ -214,8 +216,6 @@ class ProcessedGitGraph(RawGitGraph):
             # sanity check, if any weights are 1, remove.
             if weighted[edge] > 0.99:
                 hit_list.add(edge)
-            # if reviewer has less then 3 core reviews, probably
-            # not a core
             if not edge[0].is_core():
                 hit_list.add(edge)
             # if author core and less then x commits
