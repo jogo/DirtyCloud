@@ -33,24 +33,26 @@ def render_graph(graph, name):
             nodes.append(edge.reviewer)
         if edge.author not in nodes:
             nodes.append(edge.author)
-
-        edges.append({"source": nodes.index(edge.reviewer),
-                      "target": nodes.index(edge.author),
-                      "value": edge.score()})
+        edge_dict = edge.to_dict()
+        edge_dict['source'] = nodes.index(edge.reviewer)
+        edge_dict['target'] = nodes.index(edge.author)
+        edges.append(edge_dict)
 
     # convert node to target format
     json_nodes = []
     orgs = []
     for node in nodes:
+        node_dict = node.to_dict()
         if not node.company:
             # use email
             if node.email not in orgs:
                 orgs.append(node.email)
-            json_nodes.append({'name': node.name, 'group': orgs.index(node.email)})
+            node_dict['group'] = orgs.index(node.email)
         else:
             if node.company not in orgs:
                 orgs.append(node.company)
-            json_nodes.append({'name': node.name, 'group': orgs.index(node.company)})
+            node_dict['group'] = orgs.index(node.company)
+        json_nodes.append(node_dict)
 
     # convert to json
     with open('git.json', 'w') as f:

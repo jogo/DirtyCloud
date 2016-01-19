@@ -16,6 +16,15 @@ circle {
   stroke-width: 1.5px;
 }
 
+.d3-tip {
+  line-height: 1;
+  padding: 11px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+
 text {
   fill: #000;
   font: 10px sans-serif;
@@ -77,13 +86,26 @@ svg.append("defs").selectAll("marker")
 var max_value  = d3.max(force.links())
 
 //Set up tooltip
-var tip = d3.tip()
+var edgetip = d3.tip()
     .attr('class', 'd3-tip')
     .offset([-10, 0])
     .html(function (d) {
-    return Math.round(d.value * 100) + "%";}
+    return d.str + "<br>" + Math.round(d.value * 100) + "%" + "<br>"
+        + d.count + "/" + d.reviewer_count;}
 )
-svg.call(tip);
+svg.call(edgetip);
+
+//Set up tooltip
+var nodetip = d3.tip()
+    .attr('class', 'd3-tip')
+    .offset([-10, 0])
+    .html(function (d) {
+        return d.name + "<br>company: " + d.company +
+            "<br>+2 review count: " + d.review_count +
+            "<br>patch count: " + d.patch_count;}
+)
+svg.call(nodetip);
+
 
 // add the links and the arrows
 var path = svg.append("svg:g").selectAll("path")
@@ -94,8 +116,9 @@ var path = svg.append("svg:g").selectAll("path")
     .attr("id",function(d,i) { return "linkId_" + i; })
     .attr("marker-end", "url(#end)");
 
-path.on('mouseover', tip.show)
-    .on('mouseout', tip.hide)
+path.on('mouseover', edgetip.show)
+    .on('mouseout', edgetip.hide)
+
 
 var drag = d3.behavior.drag()
     .origin(function(d) { return d; })
@@ -110,6 +133,11 @@ var node = svg.selectAll(".node")
     .attr("class", "node")
     .call(drag)
 ;
+
+node.on('mouseover', nodetip.show)
+    .on('mouseout', nodetip.hide)
+
+
 
 // add the nodes
 node.append("circle")

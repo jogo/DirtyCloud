@@ -21,6 +21,7 @@ import urllib.parse
 
 
 class Node(object):
+    """Node in Graph"""
     # Fetch up to date mailmap file
     r = requests.get('http://git.openstack.org/cgit/openstack/stackalytics/plain/etc/default_data.json')
     stackalytics = r.json()
@@ -54,6 +55,11 @@ class Node(object):
         else:
             return "%s" % self.name
 
+    def to_dict(self):
+        return {'name': self.name, 'review_count': self.review_count,
+                'patch_count': self.patch_count,
+                'company': self.company}
+
     @property
     def domain(self):
         """email domain"""
@@ -79,6 +85,10 @@ class Node(object):
 
 
 class Edge(object):
+    """Edge in graph
+
+    Connects reviewer to author
+    """
     def __init__(self, reviewer, author):
         super(Edge, self).__init__()
         self.reviewer = reviewer
@@ -90,6 +100,11 @@ class Edge(object):
 
     def score(self):
         return self.count / self.reviewer.review_count
+
+    def to_dict(self):
+        return {'count': self.count, 'str': self.__str__(),
+                'value': self.score(),
+                'reviewer_count': self.reviewer.review_count}
 
 
 class Graph(object):
@@ -135,7 +150,7 @@ class Graph(object):
         strongest = sorted(self.edges,
                            key=lambda edge: edge.score(),
                            reverse=True)
-        strongest = filter(lambda edge: edge.score()*100>percent, strongest)
+        strongest = filter(lambda edge: edge.score() * 100 > percent, strongest)
         return strongest
 
     def print_records(self):
@@ -146,6 +161,7 @@ class Graph(object):
 
 
 class GerritGraph(Graph):
+    """Graph based in gerrit review data."""
     def __init__(self, git_repo, repo_name):
         super(GerritGraph, self).__init__(git_repo=git_repo)
         self.change_ids = self.get_git_change_ids()
