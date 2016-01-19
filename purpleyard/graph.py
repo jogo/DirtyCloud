@@ -64,20 +64,14 @@ def main():
     optparser.add_option('-r', '--repository',
                          default='openstack/nova',
                          help='specify repository to analyze')
-    optparser.add_option('-p', '--pseudonyms',
-                         action='store_true',
-                         help='Use pseudonyms instead of email addresses')
     options, args = optparser.parse_args()
 
     config = configparser.ConfigParser()
     config.read('purple.ini')
 
     repo_path = config.get("config", "git_path") + options.repository
-
-    gitgraph = gitlogs.GitGraph(git_repo=repo_path, pseudonyms=options.pseudonyms)
-
+    gitgraph = gitlogs.GitGraph(git_repo=repo_path)
     gitgraph.print_records()
-
     generate_graph(gitgraph,
                    options.repository.replace("/", "_"))
 

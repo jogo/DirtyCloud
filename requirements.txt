@@ -1,5 +1,2 @@
 pbr>=1.6
-matplotlib
-networkx
-names
 requests
