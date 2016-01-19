@@ -77,9 +77,8 @@ class RawGitGraph(object):
 
     def __init__(self, git_repo, pseudonyms=False):
         super(RawGitGraph, self).__init__()
-        # up to date mailmap file
-        # http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json
-        r = requests.get('http://git.openstack.org/cgit/stackforge/stackalytics/plain/etc/default_data.json')
+        # Fetch up to date mailmap file
+        r = requests.get('http://git.openstack.org/cgit/openstack/stackalytics/plain/etc/default_data.json')
         self.stackalytics = r.json()
         self.git_repo = git_repo
         self.nodes = dict()  # string:node_object
