@@ -20,17 +20,15 @@ import optparse
 from purpleyard import gitlogs
 
 
-def generate_graph(gitgraph, name):
+def render_graph(graph, name):
     """Generate a json file for graphing in d3.
 
-    Args:
-        gitgraph (): ProcessedGitGraph
-        name (bool): repo name
+    :param GerritGraph graph: graph to render
     """
     # convert to list of nodes and edges
     nodes = []
     edges = []
-    for edge in gitgraph.get_strongest_edges(10):
+    for edge in graph.get_strongest_edges(10):
         if edge.reviewer not in nodes:
             nodes.append(edge.reviewer)
         if edge.author not in nodes:
@@ -70,11 +68,10 @@ def main():
     config.read('purple.ini')
 
     repo_path = config.get("config", "git_path") + options.repository
-    gitgraph = gitlogs.GerritGraph(git_repo=repo_path, repo_name=options.repository)
-    # gitgraph = gitlogs.GitGraph(git_repo=repo_path)
-    gitgraph.print_records()
-    generate_graph(gitgraph,
-                   options.repository.replace("/", "_"))
+    graph = gitlogs.GerritGraph(git_repo=repo_path, repo_name=options.repository)
+    graph.print_records()
+    render_graph(graph,
+                 options.repository.replace("/", "_"))
 
 if __name__ == '__main__':
     main()
