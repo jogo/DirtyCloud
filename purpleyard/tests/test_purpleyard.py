@@ -19,7 +19,7 @@ from purpleyard.tests import base
 class TestNode(base.TestCase):
     def setUp(self):
         super(TestNode, self).setUp()
-        self.node = gitlogs.Node("name", "company", "email")
+        self.node = gitlogs.Node("name", "email")
 
     def test_is_core(self):
         self.node.review_count = 25
