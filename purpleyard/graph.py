@@ -31,15 +31,14 @@ def generate_graph(gitgraph, name):
     nodes = []
     edges = []
     for edge in gitgraph.get_strongest_edges():
-        (reviewer, author), (hits, reviews) = edge
-        if reviewer not in nodes:
-            nodes.append(reviewer)
-        if author not in nodes:
-            nodes.append(author)
+        if edge.reviewer not in nodes:
+            nodes.append(edge.reviewer)
+        if edge.author not in nodes:
+            nodes.append(edge.author)
 
-        edges.append({"source": nodes.index(reviewer),
-                      "target": nodes.index(author),
-                      "value": hits / reviews})
+        edges.append({"source": nodes.index(edge.reviewer),
+                      "target": nodes.index(edge.author),
+                      "value": edge.score()})
 
     # convert node to target format
     json_nodes = []
@@ -75,7 +74,7 @@ def main():
 
     repo_path = config.get("config", "git_path") + options.repository
 
-    gitgraph = gitlogs.ProcessedGitGraph(git_repo=repo_path, pseudonyms=options.pseudonyms)
+    gitgraph = gitlogs.GitGraph(git_repo=repo_path, pseudonyms=options.pseudonyms)
 
     gitgraph.print_records()
 

@@ -13,7 +13,6 @@
 
 import requests
 
-import collections
 import os
 import subprocess
 
@@ -28,6 +27,7 @@ class Node(object):
         self.name = name
         self.company = company
         self.email = email
+        # TODO username
         self.review_count = 0
         self.patch_count = 0
 
@@ -46,10 +46,10 @@ class Node(object):
 
     def __str__(self):
         if self.company:
-            return "%s\n(%s)" % (self.name, self.company)
+            return "%s (%s)" % (self.name, self.company)
         else:
             domain = self.email.split('@')[1]
-            return "%s\n(%s)" % (self.name, domain)
+            return "%s (%s)" % (self.name, domain)
 
 
 class AnonNode(Node):
@@ -70,7 +70,21 @@ class AnonNode(Node):
         return "%s" % self.fake_name
 
 
-class RawGitGraph(object):
+class Edge(object):
+    def __init__(self, reviewer, author):
+        super(Edge, self).__init__()
+        self.reviewer = reviewer
+        self.author = author
+        self.count = 1
+
+    def __str__(self):
+        return "%s -> %s" % (self.reviewer, self.author)
+
+    def score(self):
+        return self.count / self.reviewer.review_count
+
+
+class GitGraph(object):
     """Extract gerrit +2 reviews from  git logs with notes.
 
     Core reviewer defined as someone who can do "Code-Review+2: ".
@@ -78,7 +92,7 @@ class RawGitGraph(object):
     """
 
     def __init__(self, git_repo, pseudonyms=False):
-        super(RawGitGraph, self).__init__()
+        super(GitGraph, self).__init__()
         # Fetch up to date mailmap file
         r = requests.get('http://git.openstack.org/cgit/openstack/stackalytics/plain/etc/default_data.json')
         self.stackalytics = r.json()
@@ -89,7 +103,9 @@ class RawGitGraph(object):
         else:
             self.node_class = Node
         self.commits = self.get_git_commits()
-        self.unweighted_graph = self.generate_raw_git_graph()
+        self.edges = []
+        self.generate_edges()
+        self.clean_edges()
 
     def get_git_commits(self):
         """Get git log with gerrit notes."""
@@ -103,19 +119,10 @@ class RawGitGraph(object):
         commits = log.split("\ncommit ")
         return commits
 
-    def generate_raw_git_graph(self):
-        """Generate list of edges based on git logs.
-
-        list = [(Reviewer,Author),(Reviewer2, Author)]
-        """
-        edges = []
+    def generate_edges(self):
+        """Generate list of edges based on git logs."""
         for commit in self.commits:
-            edge = self.parse_commit(commit)
-            if len(edge) == 0:
-                # something went wrong
-                continue
-            edges = edges + edge
-        return edges
+            self.parse_commit(commit)
 
     def get_node_by_email(self, email):
         """Look up node by email."""
@@ -126,7 +133,6 @@ class RawGitGraph(object):
 
     def parse_commit(self, commit):
         """Extract author and +2 reviewers from commit."""
-        edges = []
         for line in commit.split('\n'):
             if line.startswith("Author: "):
                 author = self.get_node(line, author=True)
@@ -134,8 +140,7 @@ class RawGitGraph(object):
                 break
         for reviewer in self.get_core_reviewers_on_commit(commit):
             reviewer.review_count += 1
-            edges.append((reviewer, author))
-        return edges
+            self.increment_edge(reviewer, author)
 
     def get_core_reviewers_on_commit(self, commit):
         """Extract core reviewers on a specific commit."""
@@ -165,6 +170,17 @@ class RawGitGraph(object):
             node.company = company
         return node
 
+    def increment_edge(self, reviewer, author):
+        """If edge already exists, increase count, else add new edge"""
+        # Look for existing edge
+        for edge in self.edges:
+            if edge.reviewer == reviewer and edge.author == author:
+                edge.count += 1
+                return edge
+        edge = Edge(reviewer=reviewer, author=author)
+        self.edges.append(edge)
+        return edge
+
     def parse_git_logs(self, line):
         """Parse git log to find name and email."""
         # https://github.com/networkx/networkx/issues/1230
@@ -185,61 +201,31 @@ class RawGitGraph(object):
                 return (user['user_name'], None)
         return (None, None)
 
-
-class ProcessedGitGraph(RawGitGraph):
-    def __init__(self, git_repo, pseudonyms=False):
-        super(ProcessedGitGraph, self).__init__(git_repo=git_repo, pseudonyms=pseudonyms)
-        self.weighted_graph = self.weight_graph()
-
-    def count_edges(self):
-        # key: (Reviewer,Author), value:edge count
-        weighted = collections.defaultdict(float)
-        # weigh edges
-        for edge in self.unweighted_graph:
-            weighted[edge] += 1
-        return weighted
-
-    def weight_graph(self):
-        """Assign weights to edges.
-
-        Weight of edge ReviewerA->AuthorB:
-        weight = (# duplicate edges)/(# of reviews by ReviewerA)
-        """
-        # key: (Reviewer,Author), value:weight
-        weighted = self.count_edges()
-        # normalize weights by total reviews per reviewer
-        for edge in weighted:
-            weighted[edge] = weighted[edge] / edge[0].review_count
-        # clean up data
-        hit_list = set([])
-        for edge in weighted:
+    def clean_edges(self):
+        # TODO make this more robust
+        hit_list = []
+        for edge in self.edges:
             # sanity check, if any weights are 1, remove.
-            if weighted[edge] > 0.99:
-                hit_list.add(edge)
-            if not edge[0].is_core():
-                hit_list.add(edge)
+            if edge.score() > 0.99:
+                hit_list.append(edge)
+            elif not edge.reviewer.is_core():
+                hit_list.append(edge)
             # if author core and less then x commits
-            if (not edge[1].is_core() and edge[1].patch_count < 10):
-                hit_list.add(edge)
+            elif (not edge.author.is_core() and edge.author.patch_count < 10):
+                hit_list.append(edge)
         for hit in hit_list:
-            del weighted[hit]
-        return weighted
+            self.edges.remove(hit)
 
     def get_strongest_edges(self, n=20):
         """"Return list with top n strongest edges with raw edge numbers."""
-        # Get raw numbers
-        raw = dict()
-        edge_count = self.count_edges()
-        for key in self.weighted_graph.keys():
-            reviewer = key[0]
-            raw[key] = (edge_count[key], reviewer.review_count)
         # Sort dict by key
-        strongest = sorted(raw.items(), key=lambda x: (x[1][0] / x[1][1]),
+        strongest = sorted(self.edges,
+                           key=lambda edge: edge.score(),
                            reverse=True)
         return strongest[:n]
 
     def print_records(self):
         print("((Reviewer, Author)): weight (hits/reviews))")
-        for x in self.get_strongest_edges():
-            key, (hits, reviews) = x
-            print("'%s': %f (%d/%d)" % (key, hits / reviews, hits, reviews, ))
+        for edge in self.get_strongest_edges():
+            print("'%s': %f (%d/%d)" % (edge, edge.score(),
+                                        edge.count, edge.reviewer.review_count))
