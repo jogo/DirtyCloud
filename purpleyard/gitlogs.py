@@ -71,7 +71,8 @@ class Node(object):
                         return company['company_name']
         # check email domains
         for company in self.stackalytics["companies"]:
-            if self.domain in company["domains"]:
+            # domain substring matching
+            if any([domain and self.domain.endswith(domain) for domain in company["domains"]]):
                 return company["company_name"]
 
         return None
